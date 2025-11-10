@@ -1,0 +1,120 @@
+{
+  "name": "lxc_backup_alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "<YOUR_WEBHOOK_PATH>",
+        "options": {}
+      },
+      "id": "b2253d9f-071f-4e63-a89b-606f0cbbce1a",
+      "name": "Webhook (Recibe ping de Proxmox)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-880,0],
+      "webhookId": "<YOUR_WEBHOOK_ID>"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true,"leftValue": "","typeValidation": "strict","version": 2},
+          "conditions": [
+            {"leftValue": "={{ $json.body.status }}","operator": {"type": "string","operation": "equals"},"rightValue": "fallo","id": "7da58e26-19cb-44c3-a13a-5f11040e4666"}
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8facae47-e282-4b1a-be1d-787be1eb2ee6",
+      "name": "IF: ¿Falló Rclone?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-656,0],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "chatId": "<YOUR_TELEGRAM_CHAT_ID>",
+        "text": "=<b>🚨 ¡FALLO CRÍTICO DE RCLONE!</b>   El script de Proxmox no pudo sincronizar los backups con Google Drive.   <b>Motivo:</b> <pre>{{ $json.body.reason }}</pre>",
+        "additionalFields": {"appendAttribution": false,"parse_mode": "HTML"}
+      },
+      "id": "3d4e62f9-f64a-4e40-ae03-1fb8eafd5b8f",
+      "name": "Telegram: Fallo Total",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-432,96],
+      "webhookId": "<YOUR_WEBHOOK_ID>",
+      "credentials": {"telegramApi": {"id": "<YOUR_TELEGRAM_CREDENTIAL_ID>","name": "Telegram Credentials"}}
+    },
+    {
+      "parameters": {
+        "chatId": "<YOUR_TELEGRAM_CHAT_ID>",
+        "text": "=<b>⚠️ ALERTA DE BACKUP</b>\n\nSincronización completada, pero con fallos: \n<b>Backups Válidos:</b> {{ $json.body.success_count }}\n<b>Backups Fallidos:</b> {{ $json.body.fail_count }} \n\n<b>Archivos Omitidos:</b>\n<pre>{{ $json.body.fail_reasons }}</pre>",
+        "additionalFields": {"appendAttribution": false,"parse_mode": "HTML"}
+      },
+      "id": "e03f72a2-c6d3-40f2-a7e3-1ea5e183415c",
+      "name": "Telegram: Éxito con Fallos",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-208,-192],
+      "webhookId": "<YOUR_WEBHOOK_ID>",
+      "credentials": {"telegramApi": {"id": "<YOUR_TELEGRAM_CREDENTIAL_ID>","name": "Telegram Credentials"}}
+    },
+    {
+      "parameters": {
+        "chatId": "<YOUR_TELEGRAM_CHAT_ID>",
+        "text": "=<b>✅ ÉXITO: Backups LXC Sincronizados</b>\n\n<b>Backups Válidos:</b> {{ $json.body.success_count }}\n<b>Backups Fallidos:</b> 0",
+        "additionalFields": {"appendAttribution": false,"parse_mode": "HTML"}
+      },
+      "id": "0d97c752-ab82-4971-8ce5-003af7c96029",
+      "name": "Telegram: Éxito Total",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-208,0],
+      "webhookId": "<YOUR_WEBHOOK_ID>",
+      "credentials": {"telegramApi": {"id": "<YOUR_TELEGRAM_CREDENTIAL_ID>","name": "Telegram Credentials"}}
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true,"leftValue": "","typeValidation": "loose","version": 2},
+          "conditions": [
+            {"id": "5c1071f7-bcc0-4648-a12f-a5f00c56ebff","leftValue": "={{ $json.body.fail_count }}","rightValue": 0,"operator": {"type": "number","operation": "gt"}}
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-432,-96],
+      "id": "7d7f38cc-834d-48c0-96be-bd030f6bdc05",
+      "name": "IF: ¿Hubo Backups Corruptos?"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook (Recibe ping de Proxmox)": {
+      "main": [[{"node": "IF: ¿Falló Rclone?","type": "main","index": 0}]]
+    },
+    "IF: ¿Falló Rclone?": {
+      "main": [
+        [{"node": "Telegram: Fallo Total","type": "main","index": 0}],
+        [{"node": "IF: ¿Hubo Backups Corruptos?","type": "main","index": 0}]
+      ]
+    },
+    "IF: ¿Hubo Backups Corruptos?": {
+      "main": [
+        [{"node": "Telegram: Éxito con Fallos","type": "main","index": 0}],
+        [{"node": "Telegram: Éxito Total","type": "main","index": 0}]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {"executionOrder": "v1"},
+  "versionId": "be5cc42e-8cce-4b72-80b7-20c318b77b22",
+  "meta": {"instanceId": "<YOUR_INSTANCE_ID>"},
+  "id": "EXSoT75lrfKHyUrE",
+  "tags": []
+}

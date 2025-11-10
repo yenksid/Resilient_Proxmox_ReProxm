@@ -1,0 +1,81 @@
+{
+  "name": "host_backup_alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "<YOUR_WEBHOOK_PATH>",
+        "options": {}
+      },
+      "id": "93a70785-c3bc-48bb-b365-b8aa9a743a3d",
+      "name": "Host Backup Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [-736,0],
+      "webhookId": "<YOUR_WEBHOOK_ID>"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"version": 2},
+          "conditions": [
+            {"leftValue": "={{ $json.body.status }}","operator": {"type": "string","operation": "equals"},"rightValue": "fail"}
+          ]
+        },
+        "options": {}
+      },
+      "id": "6792c5fd-7ee3-4c9f-9eef-b0c1e7e35da9",
+      "name": "IF: Did Host Backup Fail?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-496,0],
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "chatId": "<YOUR_TELEGRAM_CHAT_ID>",
+        "text": "=<b>🚨 HOST BACKUP FAILURE</b>\n\nFailed to create host config archive.\n\n<b>Reason:</b>\n<pre>{{ $json.body.reason }}</pre>",
+        "additionalFields": {"appendAttribution": false,"parse_mode": "HTML"}
+      },
+      "id": "c5a38b42-6107-4916-926a-01b6b7183762",
+      "name": "Telegram: Host Fail",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-256,96],
+      "webhookId": "<YOUR_WEBHOOK_ID>",
+      "credentials": {"telegramApi": {"id": "<YOUR_TELEGRAM_CREDENTIAL_ID>","name": "Telegram Credentials"}}
+    },
+    {
+      "parameters": {
+        "chatId": "<YOUR_TELEGRAM_CHAT_ID>",
+        "text": "<b>✅ HOST BACKUP SUCCESS</b>\n\nProxmox host config (`/etc`, `/root`) was successfully archived.",
+        "additionalFields": {"appendAttribution": false,"parse_mode": "HTML"}
+      },
+      "id": "30082523-4a69-456c-a3b4-3253ed6a79cc",
+      "name": "Telegram: Host Success",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [-256,-96],
+      "webhookId": "<YOUR_WEBHOOK_ID>",
+      "credentials": {"telegramApi": {"id": "<YOUR_TELEGRAM_CREDENTIAL_ID>","name": "Telegram Credentials"}}
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Host Backup Webhook": {
+      "main": [[{"node": "IF: Did Host Backup Fail?","type": "main","index": 0}]]
+    },
+    "IF: Did Host Backup Fail?": {
+      "main": [
+        [{"node": "Telegram: Host Success","type": "main","index": 0}],
+        [{"node": "Telegram: Host Fail","type": "main","index": 0}]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {"executionOrder": "v1"},
+  "versionId": "4f3fc33f-4001-4c51-a481-6b0bdcd99d90",
+  "meta": {"instanceId": "<YOUR_INSTANCE_ID>"},
+  "id": "3FGm2lidqtjX7gdb",
+  "tags": []
+}

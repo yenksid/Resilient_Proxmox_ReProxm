@@ -1,0 +1,51 @@
+{
+  "name": "disk-alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "<YOUR_WEBHOOK_PATH>",
+        "options": {}
+      },
+      "id": "3558845b-de47-4a35-9e31-1ab0445a2d86",
+      "name": "Disk Alert Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [0,0],
+      "webhookId": "<YOUR_WEBHOOK_ID>"
+    },
+    {
+      "parameters": {
+        "chatId": "<YOUR_TELEGRAM_CHAT_ID>",
+        "text": "=<b>🚨 DISK USAGE ALERT</b>\n\nYour backup disk is almost full!\n\n<b>Path:</b> <pre>{{ $json.body.path }}</pre>\n<b>Usage:</b> {{ $json.body.usage }}% (Threshold: {{ $json.body.threshold }}%)",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "2476e008-b39d-41e4-9606-dfd78b9ee79f",
+      "name": "Telegram: Disk Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [192,0],
+      "webhookId": "<YOUR_WEBHOOK_ID>",
+      "credentials": {
+        "telegramApi": {
+          "id": "<YOUR_TELEGRAM_CREDENTIAL_ID>",
+          "name": "Telegram Credentials"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Disk Alert Webhook": {
+      "main": [[{"node": "Telegram: Disk Alert","type": "main","index": 0}]]
+    }
+  },
+  "active": true,
+  "settings": {"executionOrder": "v1"},
+  "versionId": "321b7cb7-74ec-4349-9d51-8c4ebacc6abf",
+  "meta": {"instanceId": "<YOUR_INSTANCE_ID>"},
+  "id": "5ENCuQohG067Cann",
+  "tags": []
+}
