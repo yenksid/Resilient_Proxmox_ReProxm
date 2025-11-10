@@ -186,8 +186,8 @@ $MARK_END
   # Remove any previous managed section
   CUR="$(printf '%s\n' "$CUR" | awk -v s="$MARK_START" -v e="$MARK_END" '
     BEGIN {skip=0}
-    index(\$0,s){skip=1; next}
-    index(\$0,e){skip=0; next}
+    index($0,s){skip=1; next}
+    index($0,e){skip=0; next}
     skip==0{print}
   ')"
 
