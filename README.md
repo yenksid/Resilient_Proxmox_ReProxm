@@ -1,3 +1,4 @@
+English | [Español](README-es.md)
 # Resilient Proxmox (ReProxm)
 ![Proxmox](https://img.shields.io/badge/Proxmox-E97B00?style=flat-square&logo=proxmox&logoColor=white)
 ![Bash](https://img.shields.io/badge/GNU%20Bash-4EAA25?style=flat-square&logo=gnubash&logoColor=white)

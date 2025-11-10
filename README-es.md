@@ -1,3 +1,4 @@
+[English](README.md) | Español
 # Proxmox Resiliente (ReProxm)
 
 > Para microservidores inestables que necesitan recuperarse automáticamente

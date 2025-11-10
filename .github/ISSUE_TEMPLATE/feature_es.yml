@@ -1,0 +1,21 @@
+name: "Solicitud de mejora (ES)"
+description: Propón una mejora o nueva capacidad
+labels: ["enhancement", "lang:es", "needs triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema a resolver
+      description: ¿Qué dolor elimina esta mejora?
+    validations: { required: true }
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta de solución
+      description: Describe UX/flags de CLI, configs, salidas.
+    validations: { required: true }
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterios de aceptación
+      description: Resultados claros y verificables.

@@ -1,0 +1,20 @@
+name: Label by template language
+on:
+  issues:
+    types: [opened, edited]
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add language label
+        uses: actions-ecosystem/action-add-labels@v1
+        if: contains(github.event.issue.body, 'Reporte de bug') || contains(github.event.issue.title, '(ES)')
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          labels: lang:es
+      - name: Add language label (EN)
+        uses: actions-ecosystem/action-add-labels@v1
+        if: contains(github.event.issue.body, 'Bug report') || contains(github.event.issue.title, '(EN)')
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          labels: lang:en
