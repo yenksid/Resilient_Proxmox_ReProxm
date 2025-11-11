@@ -19,24 +19,27 @@ umask 027 # (EN) Log/staging files not world-readable. (ES) Logs/staging no legi
 # ----------------- Configuration (EDIT THESE) -----------------
 # ----------------- Configuración (EDITAR ESTO) -----------------
 
-LOCAL_DUMP_FOLDER="/mnt/disco8tb/dump"
-LOCAL_STAGING_FOLDER="/mnt/disco8tb/cloud_staging"
-REMOTE_FOLDER="gdrive:LXC_Backups"
-N8N_WEBHOOK_URL="http://10.0.0.62:5678/webhook/rclone-lxc-sync-status"
-LOG_FILE="/mnt/disco8tb/logs/sync_lxc_backups.log"
+LOCAL_DUMP_FOLDER="<PLACEHOLDER_LOCAL_DUMP_FOLDER>"        # e.g., /mnt/backup/dump
+LOCAL_STAGING_FOLDER="<PLACEHOLDER_LOCAL_STAGING_FOLDER>"    # e.g., /mnt/backup/cloud_staging
+REMOTE_FOLDER="<PLACEHOLDER_RCLONE_REMOTE>"                # e.g., gdrive:LXC_Backups
+N8N_WEBHOOK_URL="<PLACEHOLDER_N8N_LXC_SYNC_WEBHOOK_URL>"     # e.g., http://<n8n-ip>:5678/webhook/lxc-sync
+LOG_FILE="<PLACEHOLDER_LOG_FILE_PATH>"                     # e.g., /mnt/backup/logs/sync_lxc_backups.log
 DRYRUN=${DRYRUN:-0} # (EN) Run with 'DRYRUN=1 ...' to test. (ES) Ejecutar con 'DRYRUN=1 ...' para probar.
 # --------------------------------------------------------------
 
 # --- Logging and Helpers (defined before flock) ---
 # --- Logging y Helpers (definidos ANTES del lock) ---
-mkdir -p "$(dirname "$LOG_FILE")"
+# (EN) We must create the log dir *after* LOG_FILE is set, but define functions first.
+# (ES) Debemos crear el dir de log *después* de definir LOG_FILE, pero definir las funciones primero.
 
 log() {
   local message="$*"
   local timestamp
   timestamp=$(printf '[%(%Y-%m-%d %H:%M:%S)T]' -1)
   # (EN) Log to console and to file. (ES) Log a consola y archivo.
-  echo "$timestamp $message" | tee -a "$LOG_FILE"
+  # (EN) We tee to stderr to avoid polluting stdout, which might be captured.
+  # (ES) Escribimos a stderr para no contaminar stdout, que podría ser capturado.
+  echo "$timestamp $message" | tee -a "$LOG_FILE" >&2
 }
 
 json_escape() {
@@ -52,7 +55,9 @@ json_escape() {
 
 send_n8n_json() {
   local payload="$1"
-  if [[ -n "${N8N_WEBHOOK_URL:-}" ]]; then
+  # (EN) Check if URL is set and not the default placeholder
+  # (ES) Comprobar si la URL está definida y no es el placeholder
+  if [[ -n "${N8N_WEBHOOK_URL:-}" && "${N8N_WEBHOOK_URL}" != "<PLACEHOLDER_"*">" ]]; then
     # (EN) Silent on success, show error on fail, non-blocking.
     # (ES) Silencioso en éxito, muestra error si falla, no bloqueante.
     curl -fsS -X POST -H "Content-Type: application/json" --data-raw "$payload" "$N8N_WEBHOOK_URL" || true
@@ -76,8 +81,7 @@ wait_stable_size() {
 }
 # --- Fin de helpers ---
 
-# --- Lockfile ---
-# (EN) Robust lockdir fallback. (ES) Lockdir robusto con fallback.
+# --- (EN) Robust lockdir fallback. (ES) Lockdir robusto con fallback.
 LOCKDIR="/var/lock"
 [[ -d "$LOCKDIR" ]] || LOCKDIR="/run/lock"
 exec 9>"$LOCKDIR/sync_lxc_backups.lock"
@@ -87,8 +91,8 @@ if ! flock -n 9; then
 fi
 # (EN) Lock is auto-released on script exit. (ES) El lock se libera al salir.
 
-# --- Command Definitions (for DRYRUN) ---
-# --- Definiciones de Comandos (para DRYRUN) ---
+# --- (EN) Command Definitions (for DRYRUN) ---
+# --- (ES) Definiciones de Comandos (para DRYRUN) ---
 copy_cmd=(cp -f --reflink=auto --sparse=always)
 rclone_cmd=(rclone sync "$LOCAL_STAGING_FOLDER" "$REMOTE_FOLDER"
   --log-file "${LOG_FILE}.rclone" --log-level INFO
@@ -109,10 +113,10 @@ if (( DRYRUN )); then
   rclone_cmd+=(--dry-run)      # (EN) Add --dry-run flag. (ES) Añade la bandera --dry-run.
   DRYRUN_MODE="dryrun"
 fi
-# --- Fin Definiciones de comandos ---
+# --- (ES) Fin Definiciones de comandos ---
 
-# --- Robust Error Traps (ERR & Signal) ---
-# --- Traps de Error Robustos (ERR y Señal) ---
+# --- (EN) Robust Error Traps (ERR & Signal) ---
+# --- (ES) Traps de Error Robustos (ERR y Señal) ---
 _on_error() {
   local exit_code=$?
   local line_number=$LINENO
@@ -124,20 +128,24 @@ _on_error() {
   
   local reason
   reason=$(printf "Error script linea %s (codigo %s): %s" "$line_number" "$exit_code" "$command")
-  send_n8n_json "$(printf '{"status":"fallo","mode":"%s","reason":"%s"}' "$DRYRUN_MODE" "$(json_escape "$reason")")"
+  send_n8n_json "$(printf '{"status":"fail","mode":"%s","reason":"%s"}' "$DRYRUN_MODE" "$(json_escape "$reason")")"
 }
 trap _on_error ERR
 
 _on_term() {
   log "--- ¡INTERRUMPIDO POR SEÑAL! (SIGINT/SIGTERM) ---"
-  send_n8n_json "$(printf '{"status":"fallo","mode":"%s","reason":"Script interrumpido por señal (SIGTERM/SIGINT)"}' "$DRYRUN_MODE")"
+  send_n8n_json "$(printf '{"status":"fail","mode":"%s","reason":"Script interrumpido por señal (SIGTERM/SIGINT)"}' "$DRYRUN_MODE")"
   exit 130
 }
 trap _on_term INT TERM
-# --- Fin del Debugger ---
+# --- (ES) Fin del Debugger ---
 
-# --- Preflight Check ---
+# --- (EN) Preflight Check --- (ES) Chequeo Pre-vuelo ---
 preflight() {
+  # (EN) Create log directory *after* LOG_FILE is set
+  # (ES) Crear dir de log *después* de definir LOG_FILE
+  mkdir -p "$(dirname "$LOG_FILE")"
+
   log "Ejecutando chequeos pre-vuelo..."
   # (EN) 1. Check bins. (ES) 1. Verificar binarios.
   for bin in rclone zstd pct awk grep stat df curl cp touch sort tail; do
@@ -316,7 +324,7 @@ log "Proceso de backup a la nube finalizado."
 # (EN) Send final success payload.
 # (ES) Enviar payload final de éxito.
 STATUS_PAYLOAD=$(printf '{"status":"exito", "mode":"%s", "success_count":%d, "fail_count":%d, "fail_reasons":"%s"}' \
-    "$DRYRUN_MODE" "$SUCCESS_BACKUPS" "$FAILED_BACKUPS" "$(json_escape "$FAILED_REASONS")")
+    "$DRYRUN_MODE" "$SUCCESS_BACKUPS" "$FAILED_REASONS" "$(json_escape "$FAILED_REASONS")")
 send_n8n_json "$STATUS_PAYLOAD"
 
 SCRIPT_END_TIME=$(date +%s)

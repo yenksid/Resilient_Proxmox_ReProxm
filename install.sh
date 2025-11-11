@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 # =================================================================
-# Proxmox Resilient Kit Installer
+# Proxmox Resilient Kit Installer (ReProxm)
 #
-# Installs and configures the full backup/verification/monitoring
-# toolkit: dependencies, script deployment, placeholder injection,
-# and cron scheduling.
+# v4.4: Añade la configuración de LOG_FILE para los 3 scripts.
 # =================================================================
 
 set -Eeuo pipefail
@@ -29,7 +27,6 @@ if (( EUID != 0 )); then
 fi
 
 # -------------------- Paths --------------------
-# Assumes install.sh is at the repo root, with ./scripts beside it.
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 SCRIPTS_SOURCE_DIR="$SCRIPT_DIR/scripts"
 SCRIPTS_DEST_DIR="/root"
@@ -44,7 +41,6 @@ require_cmd() {
 }
 
 ask() {
-  # ask "Prompt" "default" -> echoes answer (default if empty)
   local prompt="$1" default="${2:-}"
   local answer
   if [[ -n "$default" ]]; then
@@ -57,15 +53,14 @@ ask() {
 }
 
 sed_escape() {
-  # Escape backslashes and ampersands for sed replacement
   local s="$1"
   s="${s//\\/\\\\}"
   s="${s//&/\\&}"
+  s="${s//|/\\|}" # Añadido escape para el delimitador
   printf '%s' "$s"
 }
 
 safe_copy() {
-  # Copies $1 -> $2 backing up existing target
   local src="$1" dst="$2"
   if [[ ! -f "$src" ]]; then
     log_error "Source file not found: $src"
@@ -77,10 +72,9 @@ safe_copy() {
 }
 
 replace_placeholder() {
-  # replace_placeholder <file> <placeholder> <value>
   local file="$1" placeholder="$2" value="$3"
-  value="$(sed_escape "$value")"
-  sed -i "s|${placeholder}|${value}|g" "$file"
+  value_escaped="$(sed_escape "$value")"
+  sed -i "s|${placeholder}|${value_escaped}|g" "$file"
 }
 
 install_dependencies() {
@@ -100,11 +94,15 @@ ask_questions() {
   log_info "Configuration — please answer the prompts below."
 
   # 1) Disk path (base mount for all local data)
-  DISK_PATH="$(ask 'Path to your backup disk (e.g., /mnt/backup)' '/mnt/backup')"
+  DISK_PATH="$(ask 'Path to your backup disk (e.g., /mnt/disco8tb)' '/mnt/disco8tb')"
   [[ -n "$DISK_PATH" ]] || log_error "Backup disk path cannot be empty."
 
+  # --- ¡NUEVO! Pregunta por la ruta de logs ---
+  LOG_PATH="$(ask 'Path for log files' "$DISK_PATH/logs")"
+  
   # Create common directories proactively
   mkdir -p "$DISK_PATH"/{dump,cloud_staging,host_backup}
+  mkdir -p "$LOG_PATH"
 
   # 2) rclone remote target
   RCLONE_NAME="$(ask "Your rclone remote name (e.g., gdrive)" "gdrive")"
@@ -113,16 +111,15 @@ ask_questions() {
 
   # 3) n8n webhooks
   log_warn "Use your n8n INTERNAL IP in webhook URLs (e.g., http://10.0.0.62:5678/webhook/...) to avoid NAT loopback issues."
-  N8N_LXC_URL="$(ask 'n8n Webhook URL for LXC alerts'  '')"
-  N8N_HOST_URL="$(ask 'n8n Webhook URL for Host backup alerts'  '')"
-  N8N_DISK_URL="$(ask 'n8n Webhook URL for Disk alerts'  '')"
+  N8N_LXC_URL="$(ask 'n8n Webhook URL for LXC alerts' '')"
+  N8N_HOST_URL="$(ask 'n8n Webhook URL for Host backup alerts' '')"
+  N8N_DISK_URL="$(ask 'n8n Webhook URL for Disk alerts' '')"
 
   # 4) Optional thresholds/tags/retention
   THRESHOLD_PERCENT="$(ask 'Disk usage alert threshold (%)' '90')"
   HOST_TAG="$(ask 'Host backup tag prefix' 'pmox-host')"
   KEEP_DAYS="$(ask 'Days to keep host backups' '7')"
 
-  # Basic sanity
   [[ "$THRESHOLD_PERCENT" =~ ^[0-9]+$ ]] || log_error "Threshold must be a number."
   [[ "$KEEP_DAYS" =~ ^[0-9]+$ ]] || log_error "Keep days must be a number."
 }
@@ -133,30 +130,33 @@ copy_and_configure_scripts() {
   [[ -d "$SCRIPTS_SOURCE_DIR" ]] || log_error "Scripts folder not found: $SCRIPTS_SOURCE_DIR"
 
   safe_copy "$SCRIPTS_SOURCE_DIR/sync_lxc_backups.sh" "$SYNC_SCRIPT"
-  safe_copy "$SCRIPTS_SOURCE_DIR/backup_host.sh"      "$HOST_SCRIPT"
+  safe_copy "$SCRIPTS_SOURCE_DIR/backup_host.sh"     "$HOST_SCRIPT"
   safe_copy "$SCRIPTS_SOURCE_DIR/check_disk.sh"       "$DISK_SCRIPT"
 
   chmod +x "$SYNC_SCRIPT" "$HOST_SCRIPT" "$DISK_SCRIPT"
 
-  # Inject placeholders — keep in sync with script placeholder names
+  # Inject placeholders
+  
   # sync_lxc_backups.sh
   replace_placeholder "$SYNC_SCRIPT" "<PLACEHOLDER_LOCAL_DUMP_FOLDER>"        "$DISK_PATH/dump"
   replace_placeholder "$SYNC_SCRIPT" "<PLACEHOLDER_LOCAL_STAGING_FOLDER>"     "$DISK_PATH/cloud_staging"
   replace_placeholder "$SYNC_SCRIPT" "<PLACEHOLDER_RCLONE_REMOTE>"            "$RCLONE_REMOTE"
   replace_placeholder "$SYNC_SCRIPT" "<PLACEHOLDER_N8N_LXC_SYNC_WEBHOOK_URL>" "$N8N_LXC_URL"
+  replace_placeholder "$SYNC_SCRIPT" "<PLACEHOLDER_LOG_FILE_PATH>"            "$LOG_PATH/sync_lxc_backups.log" # <-- ¡NUEVO!
 
   # backup_host.sh
   replace_placeholder "$HOST_SCRIPT" "<PLACEHOLDER_HOST_BACKUP_DEST_DIR>"     "$DISK_PATH/host_backup"
-  #replace_placeholder "$HOST_SCRIPT" "<PLACEHOLDER_HOST_SOURCES>"             "\"/etc\" \"/root\""
-  replace_placeholder "$HOST_SCRIPT" "<PLACEHOLDER_HOST_SOURCES>"             "/etc /root"
+  replace_placeholder "$HOST_SCRIPT" "<PLACEHOLDER_HOST_SOURCES>"             "\"/etc\" \"/root\"" # Bug fix para array
   replace_placeholder "$HOST_SCRIPT" "<PLACEHOLDER_KEEP_DAYS>"                "$KEEP_DAYS"
   replace_placeholder "$HOST_SCRIPT" "<PLACEHOLDER_N8N_HOST_WEBHOOK_URL>"     "$N8N_HOST_URL"
   replace_placeholder "$HOST_SCRIPT" "<PLACEHOLDER_HOST_TAG>"                 "$HOST_TAG"
+  replace_placeholder "$HOST_SCRIPT" "<PLACEHOLDER_LOG_FILE_PATH>"            "$LOG_PATH/backup_host.log" # <-- ¡NUEVO!
 
   # check_disk.sh
   replace_placeholder "$DISK_SCRIPT" "<PLACEHOLDER_N8N_DISK_WEBHOOK_URL>"     "$N8N_DISK_URL"
   replace_placeholder "$DISK_SCRIPT" "<PLACEHOLDER_DISK_PATH>"                "$DISK_PATH"
   replace_placeholder "$DISK_SCRIPT" "<PLACEHOLDER_THRESHOLD_PERCENT>"        "$THRESHOLD_PERCENT"
+  replace_placeholder "$DISK_SCRIPT" "<PLACEHOLDER_LOG_FILE_PATH>"            "$LOG_PATH/check_disk.log" # <-- ¡NUEVO!
 
   log_success "Scripts deployed and configured."
 }
@@ -171,7 +171,7 @@ $MARK_START
 # 4:00 AM: Back up the Proxmox host configuration
 0 4 * * * /root/backup_host.sh >/dev/null 2>&1
 # 4:30 AM: Verify and sync LXC backups to the cloud
-30 4 * * * /root/sync_lxc_backups.sh >/dev/null 2>&1
+30 4 * * * ionice -c 3 nice -n 19 /root/sync_lxc_backups.sh >/dev/null 2>&1
 # 5:00 AM: Auto-update the Proxmox host
 0 5 * * * apt update && apt dist-upgrade -y >/dev/null 2>&1
 # 6:00 AM: Check free space on the main backup disk
@@ -179,11 +179,9 @@ $MARK_START
 $MARK_END
 "
 
-  # Read current crontab (may be empty), remove existing block, append fresh block
   local CUR
   CUR="$(crontab -l 2>/dev/null || true)"
 
-  # Remove any previous managed section
   CUR="$(printf '%s\n' "$CUR" | awk -v s="$MARK_START" -v e="$MARK_END" '
     BEGIN {skip=0}
     index($0,s){skip=1; next}
@@ -191,21 +189,21 @@ $MARK_END
     skip==0{print}
   ')"
 
-  # Compose new crontab and install
   printf '%s\n%s\n' "$CUR" "$CRON_BLOCK" | crontab -
   log_success "Cron jobs installed."
 }
 
+# --- Ejecución Principal ---
 main() {
   install_dependencies
   ask_questions
   copy_and_configure_scripts
   setup_cron
-
+  
   log_info  "------------------------------------------------"
   log_success "Installation Complete!"
   log_info  "FINAL STEPS:"
-  log_warn  "1) Run 'rclone config' and ensure a remote named '$RCLONE_NAME' exists (points to '$RCLONE_FOLDER')."
+  log_warn  "1) Run 'rclone config' and ensure a remote named '$RCLONE_NAME' exists."
   log_warn  "2) Import and ACTIVATE the JSON workflows from '/n8n_workflows' in your n8n instance."
   log_info  "------------------------------------------------"
 }
