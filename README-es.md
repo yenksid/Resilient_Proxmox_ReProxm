@@ -1,5 +1,3 @@
-[UPDATED DOCUMENT]
-[UPDATED DOCUMENT]
 # Resilient Proxmox: For Unstable Micro-Servers
 
 > Automated disaster recovery for microservers that need to recover themselves
@@ -9,7 +7,7 @@
 [![n8n](https://img.shields.io/badge/n8n-1A1A1A?style=flat-square&logo=n8n&logoColor=white)](https://n8n.io/)
 [![rclone](https://img.shields.io/badge/rclone-0078D4?style=flat-square&logo=rclone&logoColor=white)](https://rclone.org/)
 
-[**English**](README.md) | **Español** | [**Changelog**](CHANGELOG.md)
+**English** | [**Español**](README-es.md) | [**Changelog**](CHANGELOG.md)
 
 ## 📑 Table of Contents
 
