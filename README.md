@@ -1,6 +1,3 @@
-I will apply the patch. Although the `APPEND_TO_SECTION` operation includes markdown characters (`###`) in the section title, the user's intent is unambiguous. I will proceed by matching the visible text of the header.
-
-[UPDATED DOCUMENT]
 # Resilient Proxmox: For Unstable Micro-Servers
 
 > Automated disaster recovery for microservers that need to recover themselves
