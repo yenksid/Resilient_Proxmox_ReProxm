@@ -597,3 +597,31 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 ## 📧 Support
 
 For questions, issues, or feedback, please open an issue on this repository.
+
+## 🚀 Patch Notes: ReProxm v1.0.0 ("Resilience")
+
+This release marks the transition from a brittle Proxmox host to a resilient, self-healing micro-server.
+
+### 🔍 Highlights
+
+- **Host recovery & stability**
+  - Clean Proxmox reinstall after unrecoverable `Loading initial ramdisk...` failures.
+  - Fixed network static IP configuration and cron PATH issues so scheduled jobs can find `ionice`, `nice`, and other binaries reliably.
+
+- **Resilience scripts**
+  - Production-grade versions of `sync_lxc_backups.sh`, `backup_host.sh`, and `check_disk.sh`.
+  - Persistent logging, concurrency locking with `flock`, robust `trap` handlers, dry-run mode, and JSON-safe payloads for n8n webhooks.
+
+- **Backup pipeline**
+  - 5-step verification (stable size, `.log` checks, success markers, integrity check with `zstd -t -T0`).
+  - Staging folder that always preserves the last known-good backup before syncing to Google Drive.
+
+- **Monitoring & alerts**
+  - Standardized n8n workflows (`lxc_backup_alerts`, `host_backup_alert`, `disk_alert`).
+  - Telegram alerts switched to HTML mode with `<b>` and `<pre>` to avoid `can't parse entities` errors.
+
+- **Developer workflow & project structure**
+  - `code-server` IDE running in a dedicated LXC behind Nginx Proxy Manager with SSL.
+  - Main `Resilient_Proxmox_ReProxm` repo plus a `gh-issue-importer` tool to bulk-import bilingual issues and auto-create labels.
+
+For the full technical story and detailed change history, see [`CHANGELOG.md`](CHANGELOG.md).

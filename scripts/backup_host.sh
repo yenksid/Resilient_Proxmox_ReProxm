@@ -2,8 +2,8 @@
 # =================================================================
 # Proxmox Resilient Host Backup (ReProxm)
 #
+# v2.1: Fixed _on_error trap LINENO variable, fixed 'local' scope bug.
 # v2.0: Hardened with flock, traps, preflight, logging, and integrity check.
-# v2.0: Endurecido con flock, traps, preflight, logging y chequeo de integridad.
 # =================================================================
 
 set -Eeuo pipefail
@@ -13,11 +13,11 @@ umask 027 # (EN) Log files not world-readable. (ES) Archivos de log no legibles 
 
 # ----------------- Configuration (EDIT THESE) -----------------
 DEST_DIR="<PLACEHOLDER_HOST_BACKUP_DEST_DIR>"        # e.g., /mnt/backup/host_backup
-SOURCES_TO_BACKUP=( <PLACEHOLDER_HOST_SOURCES> )       # e.g., ( "/etc" "/root" )
-KEEP_DAYS="<PLACEHOLDER_KEEP_DAYS>"                 # e.g., 7
-N8N_WEBHOOK_URL="<PLACEHOLDER_N8N_HOST_WEBHOOK_URL>"  # e.g., http://<n8n-ip>:5678/webhook/host-backup
-HOST_TAG="<PLACEHOLDER_HOST_TAG>"                   # e.g., pmox-host
-LOG_FILE="<PLACEHOLDER_LOG_FILE_PATH>"              # e.g., /mnt/backup/logs/backup_host.log
+SOURCES_TO_BACKUP=( <PLACEHOLDER_HOST_SOURCES> )     # e.g., ( "/etc" "/root" )
+KEEP_DAYS="<PLACEHOLDER_KEEP_DAYS>"                  # e.g., 7
+N8N_WEBHOOK_URL="<PLACEHOLDER_N8N_HOST_WEBHOOK_URL>" # e.g., http://<n8n-ip>:5678/webhook/host-backup
+HOST_TAG="<PLACEHOLDER_HOST_TAG>"                    # e.g., pmox-host
+LOG_FILE="<PLACEHOLDER_LOG_FILE_PATH>"               # e.g., /mnt/backup/logs/backup_host.log
 DRYRUN=${DRYRUN:-0}
 # --------------------------------------------------------------
 
@@ -79,7 +79,7 @@ fi
 # --- Debugger Robusto (ERR y Señales) ---
 _on_error() {
   local exit_code=$?
-  local line_number=$LINENO
+  local line_number=${BASH_LINENO[0]} # <-- FIX v2.1: Correct line number
   local command=$BASH_COMMAND
   log "--- ¡ERROR INESPERADO! ---"
   log "El script falló en la línea $line_number con el código $exit_code"
@@ -115,7 +115,7 @@ preflight() {
 
 SCRIPT_START_TIME=$(date +%s)
 log "================================================="
-log "Iniciando backup del host (v2.0)"
+log "Iniciando backup del host (v2.1)"
 
 preflight
 mkdir -p "$DEST_DIR"
@@ -128,8 +128,12 @@ fi
 
 log "Verificando integridad del archivo: $DEST_FILE"
 if ! "${gzip_cmd[@]}"; then
-    log "FAIL: ¡El archivo $DEST_FILE está corrupto!"
+    # --- Implementación ROBUSTEZ-03 (FIX v2.1: 'local' removed) ---
+    reason="¡Archivo de backup corrupto! El archivo $FILENAME no pasó la verificación 'gzip -t'."
+    log "FAIL: $reason"
+    send_n8n_json "$(printf '{"status":"fail","mode":"%s","reason":"%s"}' "$DRYRUN_MODE" "$(json_escape "$reason")")"
     exit 1
+    # --- Fin ---
 fi
 
 log "Archivo completado y verificado."
@@ -139,7 +143,7 @@ log "Eliminando backups de más de $KEEP_DAYS día(s) en $DEST_DIR ..."
 
 log "Backup del host finalizado."
 
-send_n8n_json "$(printf '{"status":"exito","mode":"%s"}' "$DRYRUN_MODE")" # Estandarizado a "exito"
+send_n8n_json "$(printf '{"status":"exito","mode":"%s"}' "$DRYRUN_MODE")"
 
 SCRIPT_END_TIME=$(date +%s)
 log "--- Ejecución total del script: $((SCRIPT_END_TIME - SCRIPT_START_TIME)) segundos."

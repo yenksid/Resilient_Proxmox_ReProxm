@@ -1,3 +1,5 @@
+[UPDATED DOCUMENT]
+
 # Resilient Proxmox: For Unstable Micro-Servers
 
 > Automated disaster recovery for microservers that need to recover themselves
@@ -595,3 +597,31 @@ Las contribuciones son bienvenidas. Siéntete libre de abrir *issues* o enviar *
 ## 📧 Support
 
 Para preguntas, problemas o sugerencias, abre un *issue* en este repositorio.
+
+## 🚀 Notas del parche: ReProxm v1.0.0 («Resiliencia»)
+
+Esta versión marca la transición de un host Proxmox frágil a un microservidor resiliente y capaz de autorrecuperarse.
+
+### 🔍 Puntos destacados
+
+- **Recuperación y estabilidad del host**
+  - Reinstalación limpia de Proxmox tras fallos irrecuperables en `Loading initial ramdisk...`.
+  - Corrección de la configuración de IP estática y del PATH de `cron` para que las tareas programadas encuentren de forma fiable `ionice`, `nice` y otros binarios.
+
+- **Scripts de resiliencia**
+  - Versiones a nivel *production-grade* de `sync_lxc_backups.sh`, `backup_host.sh` y `check_disk.sh`.
+  - Logging persistente, bloqueo de concurrencia con `flock`, `trap` robustos, modo de prueba (*dry-run*) y payloads JSON seguros para webhooks de n8n.
+
+- **Pipeline de backups**
+  - Verificación en 5 pasos (tamaño estable, revisión de `.log`, marcas de éxito, prueba de integridad con `zstd -t -T0`).
+  - Carpeta de *staging* que siempre preserva el último backup conocido como bueno antes de sincronizar a Google Drive.
+
+- **Monitoreo y alertas**
+  - Workflows estandarizados de n8n (`lxc_backup_alerts`, `host_backup_alert`, `disk_alert`).
+  - Alertas de Telegram cambiadas a modo HTML con `<b>` y `<pre>` para evitar errores de `can't parse entities`.
+
+- **Flujo de trabajo de desarrollo y estructura del proyecto**
+  - IDE `code-server` ejecutándose en un LXC dedicado detrás de Nginx Proxy Manager con SSL.
+  - Repositorio principal `Resilient_Proxmox_ReProxm` más la herramienta `gh-issue-importer` para importar issues bilingües en lote y auto-crear etiquetas.
+
+Para la historia técnica completa y el historial de cambios detallado, consulta [`CHANGELOG.md`](CHANGELOG.md).

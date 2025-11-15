@@ -1,0 +1,39 @@
+# =================================================================
+# Configuración Local de Fail2ban para Proxmox (ReProxm)
+#
+# Copiar a: /etc/fail2ban/jail.local
+# =================================================================
+
+[DEFAULT]
+# Redes que nunca deben ser bloqueadas
+# (EN) Add your local subnet(s) here to avoid banning yourself
+# (ES) Añade tu(s) subred(es) local(es) aquí para evitar banearte a ti mismo
+ignoreip = 127.0.0.1/8 ::1 <PLACEHOLDER_YOUR_LOCAL_SUBNET> # e.g., 192.168.1.0/24
+
+# Tiempo de bloqueo (1 hora)
+bantime = 1h
+
+# Ventana de tiempo para detectar fallos
+findtime = 10m
+
+# Número de fallos antes de bloquear
+maxretry = 5
+
+[sshd]
+# Activar esta 'jail'
+enabled = true
+port = ssh
+logpath = %(sshd_log)s
+backend = %(sshd_backend)s
+
+[proxmox]
+# Activar esta 'jail' para la UI de Proxmox
+enabled = true
+port = https,http
+filter = proxmox
+logpath = /run/systemd/journal/system-journald.socket
+backend = systemd
+# Mismos parámetros de baneo que SSH
+maxretry = 5
+bantime = 1h
+findtime = 10m
